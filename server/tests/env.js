@@ -1,0 +1,7 @@
+// Loaded before every test file (jest setupFiles): point the app at the test database.
+import dotenv from 'dotenv';
+
+dotenv.config();
+process.env.NODE_ENV = 'test';
+process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+process.env.UPLOAD_DIR = 'uploads-test';

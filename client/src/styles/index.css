@@ -1,0 +1,27 @@
+@import 'tailwindcss';
+
+/* Brand tokens -> Tailwind utilities, e.g. bg-navy-900, text-brand-orange, bg-brand-blue */
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-bangla: 'Hind Siliguri', 'Inter', sans-serif;
+
+  --color-navy-950: #071431;
+  --color-navy-900: #0b1f4b;
+  --color-navy-800: #132c63;
+  --color-navy-700: #1c3a7a;
+
+  --color-brand-orange: #f26b21;
+  --color-brand-orange-dark: #d9561a;
+  --color-brand-blue: #1e6bff;
+  --color-brand-blue-dark: #1556d6;
+  --color-brand-sky: #eaf3ff;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-white font-sans text-slate-800 antialiased;
+  }
+}

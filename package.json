@@ -1,0 +1,16 @@
+{
+  "name": "boipotro",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Boipotro (বইপত্র) - used textbook marketplace for university students in Bangladesh",
+  "scripts": {
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+    "dev": "concurrently -n server,client -c blue,magenta \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "migrate": "npm run migrate --prefix server",
+    "seed": "npm run seed --prefix server",
+    "build": "npm run build --prefix client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
