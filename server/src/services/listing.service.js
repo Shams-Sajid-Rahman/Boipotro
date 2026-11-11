@@ -240,8 +240,13 @@ export async function createListing(seller, data, files = []) {
   if (!files.length) {
     throw ApiError.badRequest('Validation failed', [{ field: 'images', message: 'Add at least one photo of the book' }]);
   }
+  const sellerId = seller.role === 'admin' && data.sellerId ? data.sellerId : seller.id;
   const id = await withTransaction(async (client) => {
     await assertCategoryExists(client, data.categoryId);
+    if (sellerId !== seller.id) {
+      const { rowCount } = await client.query('SELECT 1 FROM users WHERE id = $1 AND NOT is_banned', [sellerId]);
+      if (!rowCount) throw ApiError.badRequest('Validation failed', [{ field: 'sellerId', message: 'Unknown or banned seller' }]);
+    }
     const { rows } = await client.query(
       `INSERT INTO listings
          (seller_id, title, author, isbn, edition, category_id, university_id, condition, price, description)
@@ -249,7 +254,7 @@ export async function createListing(seller, data, files = []) {
                COALESCE($7, (SELECT university_id FROM users WHERE id = $1)),
                $8, $9, $10)
        RETURNING id`,
-      [seller.id, data.title, data.author, data.isbn ?? null, data.edition ?? null, data.categoryId,
+      [sellerId, data.title, data.author, data.isbn ?? null, data.edition ?? null, data.categoryId,
        data.universityId ?? null, data.condition, data.price, data.description ?? null],
     );
     await insertImages(client, rows[0].id, files.map((f) => publicUrlFor(f.filename)));
@@ -318,15 +323,26 @@ export async function updateListingStatus(id, user, status) {
     await lockForModify(client, id, user);
     // Sold: the buyer is whoever had the accepted offer (enables their review).
     // Back to active: clear any buyer and reopen.
+    // Sold: record the final price (accepted offer, else asking price) and the
+    // platform commission at the current rate. Reopened/reserved: clear the sale.
     await client.query(
-      `UPDATE listings
+      `WITH accepted AS (
+         SELECT o.buyer_id, o.amount FROM offers o
+         WHERE o.listing_id = $1 AND o.status = 'accepted'
+         ORDER BY o.created_at DESC LIMIT 1
+       ), rate AS (
+         SELECT COALESCE((value->>'commissionPercent')::numeric, 0) AS pct
+         FROM site_content WHERE key = 'fees'
+       )
+       UPDATE listings l
        SET status = $2,
-           buyer_id = CASE
-             WHEN $2 = 'sold' THEN (SELECT o.buyer_id FROM offers o
-                                    WHERE o.listing_id = $1 AND o.status = 'accepted'
-                                    ORDER BY o.created_at DESC LIMIT 1)
-             ELSE NULL END
-       WHERE id = $1`,
+           buyer_id        = CASE WHEN $2 = 'sold' THEN (SELECT buyer_id FROM accepted) END,
+           sold_price      = CASE WHEN $2 = 'sold' THEN COALESCE((SELECT amount FROM accepted), l.price) END,
+           sold_commission = CASE WHEN $2 = 'sold'
+                               THEN round(COALESCE((SELECT amount FROM accepted), l.price)
+                                          * COALESCE((SELECT pct FROM rate), 0) / 100, 2) END,
+           sold_at         = CASE WHEN $2 = 'sold' THEN COALESCE(l.sold_at, now()) END
+       WHERE l.id = $1`,
       [id, status],
     );
     if (status !== 'reserved') {

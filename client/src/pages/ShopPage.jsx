@@ -38,7 +38,9 @@ function FilterSidebar({ filters, update, clear }) {
   const { data: categories = [] } = useCategories();
   const { data: universities = [] } = useUniversities();
   const [price, setPrice] = useState({ min: filters.minPrice, max: filters.maxPrice });
-  useEffect(() => setPrice({ min: filters.minPrice, max: filters.maxPrice }), [filters.minPrice, filters.maxPrice]);
+  useEffect(() => {
+    setPrice({ min: filters.minPrice, max: filters.maxPrice });
+  }, [filters.minPrice, filters.maxPrice]);
 
   const conditions = filters.condition ? filters.condition.split(',') : [];
   const toggleCondition = (value) => {

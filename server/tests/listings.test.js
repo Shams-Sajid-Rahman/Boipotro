@@ -1,4 +1,5 @@
 import { api, login, bearer, closePool, createListing, categoryId, USERS, PNG } from './helpers.js';
+import { pool } from '../src/db/pool.js';
 
 afterAll(closePool);
 
@@ -9,8 +10,8 @@ describe('GET /api/listings (search, filter, paginate)', () => {
     expect(res.body).toMatchObject({ page: 1, limit: 5, total: expect.any(Number), totalPages: expect.any(Number) });
     expect(res.body.data).toHaveLength(5);
     expect(res.body.data.every((l) => l.status === 'active')).toBe(true);
-    // Seed: 30 listings, 2 reserved, 2 sold -> 26 active.
-    expect(res.body.total).toBe(26);
+    const { rows: [{ n }] } = await pool.query("SELECT count(*) AS n FROM listings WHERE status = 'active'");
+    expect(res.body.total).toBe(n);
   });
 
   test('q matches title, author and ISBN case-insensitively', async () => {

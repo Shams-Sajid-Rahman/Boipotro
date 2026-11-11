@@ -30,7 +30,8 @@ const listingFields = {
   description: optionalText(2000),
 };
 
-export const createListingSchema = z.object(listingFields);
+// sellerId: only honoured for admins (post on behalf of a user); ignored otherwise.
+export const createListingSchema = z.object({ ...listingFields, sellerId: optionalId });
 
 /** IDs of images to delete; multipart sends one field per value or a comma list. */
 const idList = z.preprocess((v) => {

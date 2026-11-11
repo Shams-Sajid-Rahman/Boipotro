@@ -1,4 +1,8 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import bcrypt from 'bcrypt';
+import { LISTING_UPLOAD_DIR, publicUrlFor } from '../../middleware/upload.js';
 import { pool, withTransaction } from '../pool.js';
 import { isProd } from '../../config/env.js';
 import { universities } from './data/universities.js';
@@ -17,6 +21,21 @@ const COVER_COLORS = {
 
 const placeholderImage = (text, bg, fg = 'FFFFFF') =>
   `https://placehold.co/400x560/${bg}/${fg}/png?text=${encodeURIComponent(text)}`;
+
+// Real covers (from Open Library) live in seeds/covers/<isbn>.jpg and are copied into
+// uploads/listings so they're served like any user upload. Falls back to a placeholder.
+const COVERS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'covers');
+
+async function coverUrlFor(listing) {
+  const source = path.join(COVERS_DIR, `${listing.isbn}.jpg`);
+  try {
+    const filename = `seed-${listing.isbn}.jpg`;
+    await fs.copyFile(source, path.join(LISTING_UPLOAD_DIR, filename));
+    return publicUrlFor(filename);
+  } catch {
+    return placeholderImage(listing.title, COVER_COLORS[listing.category]);
+  }
+}
 
 /** Insert rows one by one with a fixed, parameterized statement; returns Map(key -> id). */
 async function insertAll(client, rows, sql, toParams, toKey) {
@@ -103,17 +122,10 @@ async function seedListings(client, { userIds, categoryIds, universityIds }) {
   );
 
   for (const l of listings) {
-    const listingId = listingIds.get(l.title);
-    const bg = COVER_COLORS[l.category];
-    const images = [placeholderImage(l.title, bg)];
-    for (let i = 0; i < (l.extraImages || 0); i += 1) images.push(placeholderImage('Back cover', 'F1F5F9', bg));
-
-    for (const [position, url] of images.entries()) {
-      await client.query(
-        'INSERT INTO listing_images (listing_id, url, position) VALUES ($1, $2, $3)',
-        [listingId, url, position],
-      );
-    }
+    await client.query(
+      'INSERT INTO listing_images (listing_id, url, position) VALUES ($1, $2, 0)',
+      [listingIds.get(l.title), await coverUrlFor(l)],
+    );
   }
   return listingIds;
 }
@@ -155,6 +167,14 @@ async function seedActivity(client, { userIds, listingIds }) {
       [lookup(userIds, w.user, 'user'), lookup(listingIds, w.listing, 'listing')],
     );
   }
+
+  // Sale records for seeded sold listings: ~90% of asking, 5% commission, sold 2 days after listing.
+  await client.query(
+    `UPDATE listings
+     SET sold_price = round(price * 0.9), sold_commission = round(round(price * 0.9) * 0.05, 2),
+         sold_at = created_at + interval '2 days'
+     WHERE status = 'sold'`,
+  );
 
   for (const r of reviews) {
     // The reviewer bought the (sold) book.

@@ -186,20 +186,24 @@ export function useStartConversation() {
 export const useAdminStats = () =>
   useQuery({ queryKey: ['admin', 'stats'], queryFn: () => get('/admin/stats').then((d) => d.stats) });
 
-export const useAdminList = (resource, params) =>
+/** GET /api/admin/<resource>. Used for lists, reports and single records (e.g. 'users/5'). */
+export const useAdminList = (resource, params, options = {}) =>
   useQuery({
     queryKey: ['admin', resource, params],
     queryFn: () => get(`/admin/${resource}`, params),
     placeholderData: keepPreviousData,
+    ...options,
   });
 
 export function useAdminAction() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ method, url, body }) => api.request({ method, url: `/admin${url}`, data: body }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin'] });
-      qc.invalidateQueries({ queryKey: ['listings'] });
-    },
+    onSuccess: () =>
+      Promise.all(
+        ['admin', 'listings', 'listing', 'categories', 'universities', 'site-content'].map((k) =>
+          qc.invalidateQueries({ queryKey: [k] }),
+        ),
+      ),
   });
 }

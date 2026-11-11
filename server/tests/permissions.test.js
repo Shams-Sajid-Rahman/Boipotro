@@ -47,15 +47,18 @@ describe('admin routes', () => {
   });
 
   test('banning blocks login and existing tokens immediately', async () => {
-    const victim = await login(USERS.nusrat);
+    // Fresh account so other test files' seed data (e.g. this user's listings) is untouched.
+    const email = 'ban.target@test.bd';
+    await api().post('/api/auth/register').send({ name: 'Ban Target', email, password: PASSWORD }).expect(201);
+    const victim = await login(email);
     await api().patch(`/api/admin/users/${victim.user.id}/ban`).set(bearer(admin.token)).send({ banned: true }).expect(204);
 
     expect((await api().get('/api/auth/me').set(bearer(victim.token))).status).toBe(403);
     expect((await api().post('/api/auth/refresh').set('Cookie', victim.cookie)).status).toBe(401);
-    expect((await api().post('/api/auth/login').send({ email: USERS.nusrat, password: PASSWORD })).status).toBe(403);
+    expect((await api().post('/api/auth/login').send({ email, password: PASSWORD })).status).toBe(403);
 
     await api().patch(`/api/admin/users/${victim.user.id}/ban`).set(bearer(admin.token)).send({ banned: false }).expect(204);
-    expect((await api().post('/api/auth/login').send({ email: USERS.nusrat, password: PASSWORD })).status).toBe(200);
+    expect((await api().post('/api/auth/login').send({ email, password: PASSWORD })).status).toBe(200);
   });
 
   test('admins cannot ban themselves', async () => {

@@ -14,7 +14,7 @@ export default async function globalSetup() {
   await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
   await client.end();
 
-  const env = { ...process.env, DATABASE_URL: url, NODE_ENV: 'test' };
+  const env = { ...process.env, DATABASE_URL: url, NODE_ENV: 'test', UPLOAD_DIR: 'uploads-test' };
   execFileSync(process.execPath, ['src/db/migrate.js'], { env, stdio: 'ignore' });
   execFileSync(process.execPath, ['src/db/seeds/seed.js'], { env, stdio: 'ignore' });
 }

@@ -24,5 +24,13 @@ if (!parsed.success) {
   process.exit(1);
 }
 
+if (parsed.data.NODE_ENV === 'production') {
+  const weak = ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'].filter((k) => parsed.data[k].startsWith('change-me'));
+  if (weak.length || parsed.data.JWT_ACCESS_SECRET === parsed.data.JWT_REFRESH_SECRET) {
+    console.error('Refusing to start in production with placeholder or identical JWT secrets.');
+    process.exit(1);
+  }
+}
+
 export const env = Object.freeze(parsed.data);
 export const isProd = env.NODE_ENV === 'production';

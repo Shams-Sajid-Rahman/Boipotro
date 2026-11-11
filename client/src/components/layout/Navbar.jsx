@@ -114,8 +114,21 @@ export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
-  useEffect(() => setMobileOpen(false), [location.pathname]);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // On the homepage the bar floats transparently over the hero photo until you scroll.
+  const overHero = location.pathname === '/' && !scrolled && !mobileOpen;
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     await logout();
@@ -124,7 +137,7 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-navy-900 shadow-md">
+    <header className={`sticky top-0 z-30 transition-colors duration-300 ${overHero ? 'bg-transparent' : 'bg-navy-900 shadow-md'}`}>
       <nav aria-label="Main" className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Link to="/" aria-label="Boipotro home" className="rounded focus-visible:outline-2 focus-visible:outline-white">
           <Logo light />

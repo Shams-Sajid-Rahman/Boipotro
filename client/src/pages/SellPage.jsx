@@ -8,7 +8,7 @@ import { ErrorState } from '../components/ui/EmptyState.jsx';
 import { Icon } from '../components/ui/Icons.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
-import { useCategories, useListing, useSaveListing, useUniversities } from '../hooks/useApi.js';
+import { useAdminList, useCategories, useListing, useSaveListing, useUniversities } from '../hooks/useApi.js';
 import { CONDITIONS, IMAGE_TYPES, MAX_IMAGES, MAX_IMAGE_MB } from '../lib/constants.js';
 import { getErrorMessage, getFieldErrors } from '../lib/api.js';
 
@@ -114,6 +114,10 @@ export default function SellPage() {
   const { data: categories = [] } = useCategories();
   const { data: universities = [] } = useUniversities();
   const { data: listing, isLoading, error } = useListing(id);
+  const { isAdmin } = useAuth();
+  // Admins can post on behalf of any user.
+  const { data: allUsers } = useAdminList('users', { limit: 100 }, { enabled: isAdmin && !isEdit });
+  const [sellerId, setSellerId] = useState('');
   const save = useSaveListing(id);
 
   const [form, setForm] = useState({ ...EMPTY, universityId: user?.university?.id ? String(user.university.id) : '' });
@@ -154,6 +158,7 @@ export default function SellPage() {
     for (const [k, v] of Object.entries(form)) data.append(k, v.trim());
     files.forEach((f) => data.append('images', f));
     if (removedIds.length) data.append('removeImageIds', removedIds.join(','));
+    if (sellerId) data.append('sellerId', sellerId);
 
     save.mutate(data, {
       onSuccess: (saved) => {
@@ -170,6 +175,15 @@ export default function SellPage() {
   return (
     <Page title={isEdit ? 'Edit listing' : 'Sell your book'} subtitle={isEdit ? undefined : 'List a textbook in under a minute.'} narrow>
       <form onSubmit={onSubmit} noValidate className="space-y-5 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-8">
+        {isAdmin && !isEdit && (
+          <FormField as="select" label="Post as (admin)" value={sellerId} onChange={(e) => setSellerId(e.target.value)} error={errors.sellerId}
+            hint="Leave as yourself, or list the book on behalf of a user.">
+            <option value="">Myself ({user.name})</option>
+            {allUsers?.data.filter((u) => u.id !== user.id && !u.isBanned).map((u) => (
+              <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
+            ))}
+          </FormField>
+        )}
         <ImagePicker
           existing={existing}
           onRemoveExisting={(imgId) => setRemovedIds((ids) => [...ids, imgId])}
